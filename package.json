@@ -1,0 +1,45 @@
+{
+  "name": "opencode-lisa",
+  "version": "0.1.0",
+  "description": "Native OpenCode port of Lisa's interactive specification interview workflow.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./commands/*": "./commands/*"
+  },
+  "files": [
+    "dist",
+    "commands",
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "bin": {
+    "opencode-lisa-install": "./bin/install-commands.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test test/*.test.mjs",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "opencode",
+    "plugin",
+    "lisa",
+    "specification",
+    "planning"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@opencode-ai/plugin": "^1.14.48"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "typescript": "^5.8.0"
+  }
+}
