@@ -9,14 +9,14 @@ From the consumer project root, add the plugin to `opencode.json`:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@0xarcano/open-lisa"]
+  "plugin": ["opencode-lisa"]
 }
 ```
 
 From that same project root, bootstrap the project-local OpenCode files:
 
 ```sh
-npx --package @0xarcano/open-lisa opencode-lisa
+npx --package opencode-lisa opencode-lisa
 ```
 
 That one command installs the files OpenCode discovers on disk:
@@ -35,7 +35,7 @@ If you run the bootstrap command from the wrong directory, the files will be ins
 Verify the install at any time:
 
 ```sh
-npx --package @0xarcano/open-lisa opencode-lisa doctor
+npx --package opencode-lisa opencode-lisa doctor
 ```
 
 `opencode-lisa-install` still works as a compatibility alias and now installs both commands and the Lisa skill.
@@ -65,7 +65,7 @@ The bootstrap command above handles the second part explicitly so the setup is c
 
 ## Verification
 
-1. Run `npx --package @0xarcano/open-lisa opencode-lisa doctor`.
+1. Run `npx --package opencode-lisa opencode-lisa doctor`.
 2. Confirm `.opencode/commands/lisa.md` exists.
 3. Confirm `.opencode/skills/lisa/SKILL.md` exists.
 4. Start OpenCode in the project.
@@ -78,12 +78,14 @@ The bootstrap command above handles the second part explicitly so the setup is c
 If you already use an older version of OpenCode Lisa:
 
 ```sh
-npx --package @0xarcano/open-lisa opencode-lisa
+npx --package opencode-lisa opencode-lisa
 ```
 
 That refreshes the managed command and skill files in `.opencode/`.
 
-Older examples that mention `opencode-lisa-install` refer to the compatibility installer binary, not a different npm package. The npm package name remains `@0xarcano/open-lisa`.
+Older examples that mention `opencode-lisa-install` refer to the compatibility installer binary, not a different npm package. The npm package name is `opencode-lisa`.
+
+If you previously installed `@0xarcano/open-lisa`, switch your `opencode.json` entry and `npx --package ...` commands to `opencode-lisa`.
 
 ## Runtime Files
 
