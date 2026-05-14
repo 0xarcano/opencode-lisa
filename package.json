@@ -1,6 +1,6 @@
 {
   "name": "opencode-lisa",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Native OpenCode port of Lisa's interactive specification interview workflow.",
   "type": "module",
   "main": "./dist/index.js",
