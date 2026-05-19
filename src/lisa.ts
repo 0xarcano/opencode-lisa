@@ -2,6 +2,7 @@ import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import path from "node:path"
 
 export type LisaCategory = "setup" | "core" | "integration" | "polish"
+export type InterviewKind = "spec" | "feature-list"
 
 export interface LisaOptions {
   feature: string
@@ -10,6 +11,7 @@ export interface LisaOptions {
   outputDir: string
   maxQuestions: number
   firstPrinciples: boolean
+  interviewKind: InterviewKind
 }
 
 export interface LisaState extends LisaOptions {
@@ -21,7 +23,8 @@ export interface LisaState extends LisaOptions {
   statePath: string
   markdownPath: string
   jsonPath: string
-  progressPath: string
+  /** Present only when `interviewKind` is `"spec"`. */
+  progressPath?: string
 }
 
 export interface UserStory {
@@ -47,6 +50,32 @@ export interface RalphSpec {
   userStories: UserStory[]
 }
 
+export interface FeatureCandidate {
+  id?: string
+  title: string
+  summary: string
+  rationale?: string
+  notes?: string
+}
+
+export interface NormalizedFeatureCandidate extends Omit<FeatureCandidate, "id"> {
+  id: string
+}
+
+export interface FeatureListOutput {
+  interviewKind: "feature-list"
+  project: string
+  description: string
+  generatedAt: string
+  features: NormalizedFeatureCandidate[]
+}
+
+export interface FinalFeatureListSpec {
+  description: string
+  markdown: string
+  features: FeatureCandidate[]
+}
+
 const DEFAULT_OUTPUT_DIR = "docs/specs"
 const STATE_ROOT = ".opencode/lisa"
 
@@ -70,6 +99,7 @@ export function parseLisaArgs(input: string): LisaOptions {
   let outputDir = DEFAULT_OUTPUT_DIR
   let maxQuestions = 0
   let firstPrinciples = false
+  let discovery = false
 
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index]
@@ -106,6 +136,11 @@ export function parseLisaArgs(input: string): LisaOptions {
       continue
     }
 
+    if (token === "--discovery") {
+      discovery = true
+      continue
+    }
+
     if (token === "--help" || token === "-h") {
       throw new Error("Help requested")
     }
@@ -124,13 +159,30 @@ export function parseLisaArgs(input: string): LisaOptions {
     outputDir,
     maxQuestions,
     firstPrinciples,
+    interviewKind: discovery ? "feature-list" : "spec",
+  }
+}
+
+export function createFeatureListOutput(slug: string, description: string, features: FeatureCandidate[]): FeatureListOutput {
+  return {
+    interviewKind: "feature-list",
+    project: slug,
+    description,
+    generatedAt: new Date().toISOString(),
+    features: features.map((feature, index) => ({
+      id: feature.id || `FE-${String(index + 1).padStart(3, "0")}`,
+      title: feature.title,
+      summary: feature.summary,
+      rationale: feature.rationale,
+      notes: feature.notes,
+    })),
   }
 }
 
 export async function initializeInterview(cwd: string, input: string): Promise<LisaState> {
   const options = parseLisaArgs(input)
   const now = new Date().toISOString()
-  const paths = resolveInterviewPaths(cwd, options.slug, options.outputDir)
+  const paths = resolveInterviewPaths(cwd, options.slug, options.outputDir, options.interviewKind)
   const state: LisaState = {
     ...options,
     createdAt: now,
@@ -143,18 +195,27 @@ export async function initializeInterview(cwd: string, input: string): Promise<L
   await mkdir(path.dirname(paths.statePath), { recursive: true })
   await mkdir(path.dirname(paths.draftPath), { recursive: true })
   await writeState(state)
-  await writeFile(
-    paths.draftPath,
-    [
-      `# ${options.feature}`,
-      "",
-      "## Current Understanding",
-      "",
-      "Interview initialized. Update this draft as the specification becomes clearer.",
-      "",
-    ].join("\n"),
-    "utf8",
-  )
+
+  const draftBody =
+    options.interviewKind === "feature-list"
+      ? [
+          `# ${options.feature}`,
+          "",
+          "## Project discovery",
+          "",
+          "Interview initialized. Gather goals, personas, integrations, phased delivery ideas, then synthesize concrete candidate capabilities as a prioritized feature list.",
+          "",
+        ].join("\n")
+      : [
+          `# ${options.feature}`,
+          "",
+          "## Current Understanding",
+          "",
+          "Interview initialized. Update this draft as the specification becomes clearer.",
+          "",
+        ].join("\n")
+
+  await writeFile(paths.draftPath, draftBody, "utf8")
 
   return state
 }
@@ -203,12 +264,43 @@ export async function updateDraft(cwd: string, slug: string, draft: string, ques
 export async function finalizeInterview(cwd: string, slug: string, spec: FinalSpec): Promise<RalphSpec> {
   const statePath = resolveInterviewPaths(cwd, slug, DEFAULT_OUTPUT_DIR).statePath
   const state = await readState(statePath)
+
+  if (state.interviewKind === "feature-list") {
+    throw new Error(`Interview "${slug}" is in feature-list discovery mode; use finalizeFeatureListInterview or lisa_finalize_feature_list`)
+  }
+
+  if (!state.progressPath) {
+    throw new Error("Spec interview state is missing progressPath")
+  }
+
   const output = createRalphSpec(state.slug, spec.description, spec.userStories)
 
   await mkdir(path.dirname(state.markdownPath), { recursive: true })
   await writeFile(state.markdownPath, spec.markdown, "utf8")
-  await writeFile(state.jsonPath, `${JSON.stringify(output, null, 2)}\n`, "utf8")
+  await writeFile(state.jsonPath, JSON.stringify(output, null, 2) + "\n", "utf8")
   await writeFile(state.progressPath, createProgressFile(spec.userStories), "utf8")
+  await rm(state.statePath, { force: true })
+
+  return output
+}
+
+export async function finalizeFeatureListInterview(
+  cwd: string,
+  slug: string,
+  spec: FinalFeatureListSpec,
+): Promise<FeatureListOutput> {
+  const statePath = resolveInterviewPaths(cwd, slug, DEFAULT_OUTPUT_DIR).statePath
+  const state = await readState(statePath)
+
+  if (state.interviewKind !== "feature-list") {
+    throw new Error(`Interview "${slug}" is not in feature-list discovery mode; use finalizeInterview or lisa_finalize`)
+  }
+
+  const output = createFeatureListOutput(state.slug, spec.description, spec.features)
+
+  await mkdir(path.dirname(state.markdownPath), { recursive: true })
+  await writeFile(state.markdownPath, spec.markdown, "utf8")
+  await writeFile(state.jsonPath, JSON.stringify(output, null, 2) + "\n", "utf8")
   await rm(state.statePath, { force: true })
 
   return output
@@ -247,11 +339,24 @@ export function createProgressFile(userStories: UserStory[]): string {
   return `${lines.join("\n")}${lines.length ? "\n" : ""}`
 }
 
-function resolveInterviewPaths(cwd: string, slug: string, outputDir: string) {
+function resolveInterviewPaths(cwd: string, slug: string, outputDir: string, interviewKind: InterviewKind = "spec") {
   const absoluteOutputDir = path.resolve(cwd, outputDir)
-  return {
+  const basePaths = {
     statePath: path.join(cwd, STATE_ROOT, "state", `${slug}.json`),
     draftPath: path.join(cwd, STATE_ROOT, "draft", `${slug}.md`),
+  }
+
+  if (interviewKind === "feature-list") {
+    return {
+      ...basePaths,
+      markdownPath: path.join(absoluteOutputDir, `${slug}-features.md`),
+      jsonPath: path.join(absoluteOutputDir, `${slug}-features.json`),
+      progressPath: undefined as string | undefined,
+    }
+  }
+
+  return {
+    ...basePaths,
     markdownPath: path.join(absoluteOutputDir, `${slug}.md`),
     jsonPath: path.join(absoluteOutputDir, `${slug}.json`),
     progressPath: path.join(absoluteOutputDir, `${slug}-progress.txt`),
@@ -264,8 +369,29 @@ async function latestState(cwd: string): Promise<LisaState> {
   return interviews[0]
 }
 
+function migrateLisaState(raw: Record<string, unknown>): LisaState {
+  const legacy = raw as Omit<LisaState, "interviewKind"> & { interviewKind?: InterviewKind }
+
+  const interviewKind: InterviewKind = legacy.interviewKind === "feature-list" ? "feature-list" : "spec"
+
+  if (legacy.interviewKind !== "feature-list") {
+    if (!legacy.markdownPath || !legacy.jsonPath || !legacy.progressPath) {
+      throw new Error("Invalid persisted Lisa interview state path fields")
+    }
+  } else if (!legacy.markdownPath || !legacy.jsonPath) {
+    throw new Error("Invalid persisted Lisa interview state path fields")
+  }
+
+  return {
+    ...legacy,
+    interviewKind,
+    progressPath: interviewKind === "spec" ? legacy.progressPath : undefined,
+  } as LisaState
+}
+
 async function readState(filePath: string): Promise<LisaState> {
-  return JSON.parse(await readFile(filePath, "utf8")) as LisaState
+  const raw = JSON.parse(await readFile(filePath, "utf8"))
+  return migrateLisaState(raw as Record<string, unknown>)
 }
 
 async function writeState(state: LisaState): Promise<void> {

@@ -12,7 +12,7 @@ test("installer copies Lisa commands and skill files", async () => {
   try {
     const results = await installAssets(cwd)
 
-    assert.equal(results.length, 6)
+    assert.equal(results.length, 7)
     assert.equal(await readFile(path.join(cwd, ".opencode", "commands", "lisa.md"), "utf8").then(Boolean), true)
     assert.equal(await readFile(path.join(cwd, ".opencode", "skills", "lisa", "SKILL.md"), "utf8").then(Boolean), true)
 

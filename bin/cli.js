@@ -9,6 +9,7 @@ const assetRoot = path.join(root, "assets")
 const managedFiles = [
   ["commands", "lisa.md"],
   ["commands", "lisa-plan.md"],
+  ["commands", "lisa-discovery.md"],
   ["commands", "lisa-resume.md"],
   ["commands", "lisa-cleanup.md"],
   ["commands", "lisa-help.md"],

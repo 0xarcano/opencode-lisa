@@ -1,33 +1,37 @@
 # Lisa
 
-Lisa turns a feature idea into a reviewed specification through a focused interview.
+Lisa turns unstructured thinking into actionable artifacts via focused interviews plus durable workspace files.
 
 ## When To Use Lisa
 
-Use Lisa when the user wants to shape a feature before implementation, clarify scope, or produce a PRD and structured user stories.
+Use **`/lisa`** when narrowing a single feature or epic into a Markdown PRD, Ralph-compatible user stories (`{slug}.json`), and **`{slug}-progress.txt`** checklists prior to coding.
+
+Use **`/lisa-discovery`** (append **`--discovery`**) when aligning on broader roadmap goals, consolidating SRS/notes, gathering multiple probable capabilities, then emitting **`{slug}-features.{md,json}`** payloads.
+
+Reuse **`--context`/`-c` paths** liberally—they land in persisted state so every question can reconcile against authoritative docs without re-reading user chat.
+
+Use **`/lisa-resume`** after interruptions—the agent inspects **`interviewKind`** to decide between **`lisa_finalize`** versus **`lisa_finalize_feature_list`**.
 
 ## Available Tools
 
-- `lisa_init` initializes a new interview from slash-command arguments.
-- `lisa_list` lists in-progress interviews.
-- `lisa_read` loads an interview state and draft.
-- `lisa_update_draft` replaces the current draft and updates question count.
-- `lisa_finalize` writes the final Markdown, JSON, and progress outputs.
-- `lisa_cleanup` removes in-progress Lisa state.
+- **`lisa_init`** bootstraps spec or discovery sessions from slash arguments (presence of **`--discovery`** toggles backlog mode).
+- **`lisa_list` / `lisa_read` / `lisa_update_draft`** manipulate shared `.opencode/lisa/` state for every mode.
+- **`lisa_finalize`** closes **spec interviews** (`interviewKind: "spec"`).
+- **`lisa_finalize_feature_list`** closes **discovery interviews** (`interviewKind: "feature-list"`).
+- **`lisa_cleanup`** deletes only in-progress ephemeral files.
+
+Never call the wrong finalize tool—plugin errors surfaced to operators reference the counterpart.
 
 ## Workflow
 
-1. Start with `/lisa "feature name"` or `/lisa-plan "feature name"`.
-2. Ask one focused question at a time.
-3. Prefer questions about scope, constraints, data, UX, edge cases, risks, and tradeoffs.
-4. If first-principles mode is enabled, spend the first 3-5 questions challenging whether the feature should be built and what the smallest useful solution is.
-5. Update the draft every 2-3 answers with `lisa_update_draft`.
-6. Finalize only when the user explicitly asks to finish.
+1. Start with **`/lisa "feature"`** or **`/lisa-discovery "roadmap brainstorm"`**.
+2. Ask one calibrated question per turn; escalate depth only after surface coverage.
+3. If **`firstPrinciples`** is toggled (`-f`), spend opening turns challenging framing before enumerating backlog or stories.
+4. Refresh `.opencode/lisa/draft/*.md` every few answers (`lisa_update_draft`).
+5. Finalize only when the operator explicitly signals wrapping up (`done`, etc.).
 
-## Finalization Rules
+### Finalization Contracts
 
-- Do not implement the feature.
-- Do not edit unrelated files.
-- Produce a complete Markdown PRD and Ralph-compatible user story list.
-- Call `lisa_finalize` with the slug, description, markdown, and user stories.
-- After finalization, output exactly `SPEC COMPLETE` and stop.
+Spec mode emits Ralph JSON + progress ASCII; discovery mode skips Ralph progress scaffolding and persists normalized feature rows `{ id?, title, summary, rationale?, notes? }`.
+
+After finalization helpers return, echo **`SPEC COMPLETE`** verbatim and cease tool use.

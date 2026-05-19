@@ -2,11 +2,13 @@ import type { Plugin } from "@opencode-ai/plugin"
 import { tool } from "@opencode-ai/plugin"
 import {
   cleanup,
+  finalizeFeatureListInterview,
   finalizeInterview,
   initializeInterview,
   listInterviews,
   readInterview,
   updateDraft,
+  type FeatureCandidate,
   type LisaCategory,
   type UserStory,
 } from "./lisa.js"
@@ -17,9 +19,10 @@ const LisaPlugin: Plugin = async () => {
   return {
     tool: {
       lisa_init: tool({
-        description: "Initialize a Lisa specification interview from command arguments.",
+        description:
+          "Initialize a Lisa specification or discovery interview from slash-command arguments (--discovery selects feature-list output).",
         args: {
-          arguments: tool.schema.string().describe("Raw command arguments from /lisa-plan."),
+          arguments: tool.schema.string().describe("Raw command arguments from /lisa, /lisa-plan, or /lisa-discovery."),
         },
         async execute(args, context) {
           const state = await initializeInterview(context.directory, args.arguments)
@@ -79,18 +82,66 @@ const LisaPlugin: Plugin = async () => {
           ),
         },
         async execute(args, context) {
-          const stories: UserStory[] = args.userStories.map((story) => ({
-            ...story,
-            category: story.category as LisaCategory,
-            passes: false,
-            notes: story.notes ?? "",
-          }))
-          const output = await finalizeInterview(context.directory, args.slug, {
-            description: args.description,
-            markdown: args.markdown,
-            userStories: stories,
-          })
-          return JSON.stringify(output, null, 2)
+          try {
+            const stories: UserStory[] = args.userStories.map((story) => ({
+              ...story,
+              category: story.category as LisaCategory,
+              passes: false,
+              notes: story.notes ?? "",
+            }))
+            const output = await finalizeInterview(context.directory, args.slug, {
+              description: args.description,
+              markdown: args.markdown,
+              userStories: stories,
+            })
+            return JSON.stringify(output, null, 2)
+          } catch (error) {
+            if (error instanceof Error && error.message.includes("feature-list discovery mode")) {
+              throw new Error(`${error.message} Use lisa_finalize_feature_list instead of lisa_finalize.`)
+            }
+            throw error
+          }
+        },
+      }),
+
+      lisa_finalize_feature_list: tool({
+        description:
+          "Finalize a Lisa discovery/feature-list interview. Writes Markdown and JSON only (no Ralph progress file). Requires interviewKind feature-list.",
+        args: {
+          slug: tool.schema.string(),
+          description: tool.schema.string(),
+          markdown: tool.schema.string(),
+          features: tool.schema.array(
+            tool.schema.object({
+              id: tool.schema.string().optional(),
+              title: tool.schema.string(),
+              summary: tool.schema.string(),
+              rationale: tool.schema.string().optional(),
+              notes: tool.schema.string().optional(),
+            }),
+          ),
+        },
+        async execute(args, context) {
+          try {
+            const features: FeatureCandidate[] = args.features.map((f) => ({
+              id: f.id,
+              title: f.title,
+              summary: f.summary,
+              rationale: f.rationale,
+              notes: f.notes,
+            }))
+            const output = await finalizeFeatureListInterview(context.directory, args.slug, {
+              description: args.description,
+              markdown: args.markdown,
+              features,
+            })
+            return JSON.stringify(output, null, 2)
+          } catch (error) {
+            if (error instanceof Error && error.message.includes("not in feature-list discovery mode")) {
+              throw new Error(`${error.message} Use lisa_finalize for single-feature specs.`)
+            }
+            throw error
+          }
         },
       }),
 
